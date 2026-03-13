@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Response, UploadFile, status
 
 from app.api.deps import get_qrcode_service
 from app.core.config import settings
@@ -27,6 +27,26 @@ def generate_qrcode(
 ) -> APIResponse[GenerateQRCodeResponse]:
     result = service.generate_qrcode(payload=payload)
     return success_response(message="QR Code gerado com sucesso.", data=result)
+
+
+@router.post(
+    "/generate/download",
+    status_code=status.HTTP_201_CREATED,
+    summary="Gerar QR Code e retornar imagem para download direto",
+    responses={
+        201: {
+            "content": {"image/png": {}},
+            "description": "Arquivo PNG do QR Code gerado.",
+        }
+    },
+)
+def generate_qrcode_download(
+    payload: GenerateQRCodeRequest,
+    service: QRCodeService = Depends(get_qrcode_service),
+) -> Response:
+    filename, image_bytes = service.generate_qrcode_download(payload=payload)
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=image_bytes, media_type="image/png", headers=headers)
 
 
 @router.post(
@@ -65,4 +85,3 @@ async def read_qrcode(
 
     result = service.read_qrcode(image_bytes=image_bytes)
     return success_response(message="QR Code lido com sucesso.", data=result)
-

@@ -48,7 +48,7 @@ class ItemBase(BaseModel):
     id_item: str = Field(..., min_length=1, max_length=64, examples=["ITEM-0001"])
     descricao: str = Field(..., min_length=1, max_length=200)
     regiao_destino: RegionEnum
-    uf_destino: str = Field(..., min_length=2, max_length=2, examples=["AM"])
+    uf_destino: str = Field(..., min_length=2, max_length=2, examples=["RO"])
     cidade_destino: str = Field(..., min_length=1, max_length=120)
     timestamp_criacao: datetime | None = Field(
         default=None,

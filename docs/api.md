@@ -74,6 +74,10 @@ Decisoes principais:
   - Entrada: dados do item.
   - Saida: item validado, payload JSON, QR base64 e preview de separacao.
 
+- `POST /api/v1/qrcode/generate/download`
+  - Entrada: dados do item.
+  - Saida: arquivo PNG do QR Code com download direto (`Content-Disposition: attachment`).
+
 - `POST /api/v1/qrcode/read`
   - Entrada: upload de imagem com QR.
   - Saida: payload bruto, dados validados e preview de separacao.
@@ -126,4 +130,3 @@ Casos cobertos:
 - Criar fila/event bus para comandos de atuadores.
 - Implementar camada de driver para hardware (serial, MQTT, PLC).
 - Adicionar autenticacao, autorizacao e auditoria para uso real.
-
