@@ -20,6 +20,7 @@ from app.schemas.qrcode import (
     GenerateQRCodeResponse,
     ReadQRCodeResponse,
 )
+from app.schemas.sort import SortDecision
 from app.services.sorter_service import SorterService
 
 
@@ -28,13 +29,9 @@ class QRCodeService:
         self.sorter_service = sorter_service
 
     def generate_qrcode(self, payload: GenerateQRCodeRequest) -> GenerateQRCodeResponse:
-        item = payload.to_item_data()
-        serialized_payload = self._serialize_item(item)
-        image_bytes = self._build_qr_image(serialized_payload)
-        sort_preview = self.sorter_service.preview_sort(item=item)
-
-        filename = payload.nome_arquivo or f"{item.id_item}.png"
-        safe_filename = self._sanitize_filename(filename)
+        item, serialized_payload, image_bytes, safe_filename, sort_preview = (
+            self._prepare_generation_assets(payload)
+        )
 
         return GenerateQRCodeResponse(
             item=item,
@@ -43,6 +40,10 @@ class QRCodeService:
             qr_code_base64=base64.b64encode(image_bytes).decode("ascii"),
             sort_preview=sort_preview,
         )
+
+    def generate_qrcode_download(self, payload: GenerateQRCodeRequest) -> tuple[str, bytes]:
+        _, _, image_bytes, safe_filename, _ = self._prepare_generation_assets(payload)
+        return safe_filename, image_bytes
 
     def read_qrcode(self, image_bytes: bytes) -> ReadQRCodeResponse:
         image = self._decode_image_bytes(image_bytes)
@@ -58,6 +59,19 @@ class QRCodeService:
 
     def _serialize_item(self, item: ItemData) -> str:
         return item.model_dump_json()
+
+    def _prepare_generation_assets(
+        self, payload: GenerateQRCodeRequest
+    ) -> tuple[ItemData, str, bytes, str, SortDecision]:
+        item = payload.to_item_data()
+        serialized_payload = self._serialize_item(item)
+        image_bytes = self._build_qr_image(serialized_payload)
+        sort_preview = self.sorter_service.preview_sort(item=item)
+
+        filename = payload.nome_arquivo or f"{item.id_item}.png"
+        safe_filename = self._sanitize_filename(filename)
+
+        return item, serialized_payload, image_bytes, safe_filename, sort_preview
 
     def _build_qr_image(self, data: str) -> bytes:
         qr = qrcode.QRCode(
@@ -123,4 +137,3 @@ class QRCodeService:
         if not normalized.lower().endswith(".png"):
             normalized = f"{normalized}.png"
         return normalized
-

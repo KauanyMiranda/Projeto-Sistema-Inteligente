@@ -9,7 +9,7 @@ from app.utils.response import success_response
 router = APIRouter(tags=["System"])
 
 
-@router.get("", response_model=APIResponse[ApiV1Data], summary="Status da API v1")
+@router.get("/", response_model=APIResponse[ApiV1Data], summary="Status da API v1")
 def api_v1_status() -> APIResponse[ApiV1Data]:
     data = ApiV1Data(
         app_name=settings.APP_NAME,
@@ -52,4 +52,3 @@ def get_config() -> APIResponse[ConfigData]:
         },
     )
     return success_response(message="Configuracoes carregadas.", data=data)
-

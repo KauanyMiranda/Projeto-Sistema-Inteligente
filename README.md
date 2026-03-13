@@ -108,6 +108,7 @@ uvicorn app.main:app --reload
 ## Endpoints principais
 
 - `POST /api/v1/qrcode/generate`
+- `POST /api/v1/qrcode/generate/download`
 - `POST /api/v1/qrcode/read`
 - `POST /api/v1/sort/preview`
 - `GET /api/v1/health`
@@ -199,6 +200,21 @@ curl -X POST "http://127.0.0.1:8000/api/v1/qrcode/read" \
     }
   }
 }
+```
+
+## Exemplo: gerar QR Code com download direto (PNG)
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/v1/qrcode/generate/download" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id_item": "ITEM-1001",
+    "descricao": "Modulo de camera",
+    "regiao_destino": "SUDESTE",
+    "uf_destino": "SP",
+    "cidade_destino": "Sao Paulo"
+  }' \
+  --output item-1001.png
 ```
 
 ## Exemplo: preview de separacao
