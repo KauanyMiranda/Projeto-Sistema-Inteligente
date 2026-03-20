@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, Response, UploadFile, status
+from app.schemas.qrcode_text import QRCodeTextRequest
 
 from app.api.deps import get_qrcode_service
 from app.core.config import settings
@@ -85,3 +86,19 @@ async def read_qrcode(
 
     result = service.read_qrcode(image_bytes=image_bytes)
     return success_response(message="QR Code lido com sucesso.", data=result)
+
+@router.post("/read-text")
+def read_qrcode_text(
+    request: QRCodeTextRequest,
+    service: QRCodeService = Depends(get_qrcode_service),
+):
+    item = service._parse_payload_to_item(request.payload)
+    sort_preview = service.sorter_service.preview_sort(item=item)
+
+    return success_response(
+        message="QR Code processado com sucesso",
+        data={
+            "item": item,
+            "rota": sort_preview
+        }
+    )

@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import qrcode
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import (
@@ -22,16 +23,20 @@ from app.schemas.qrcode import (
 )
 from app.schemas.sort import SortDecision
 from app.services.sorter_service import SorterService
+from app.services.produto_service import salvar_produto
 
 
 class QRCodeService:
-    def __init__(self, sorter_service: SorterService) -> None:
+    def __init__(self, sorter_service: SorterService, db: Session) -> None:
         self.sorter_service = sorter_service
+        self.db = db
 
     def generate_qrcode(self, payload: GenerateQRCodeRequest) -> GenerateQRCodeResponse:
         item, serialized_payload, image_bytes, safe_filename, sort_preview = (
             self._prepare_generation_assets(payload)
         )
+
+        salvar_produto(self.db, item)
 
         return GenerateQRCodeResponse(
             item=item,
@@ -42,13 +47,21 @@ class QRCodeService:
         )
 
     def generate_qrcode_download(self, payload: GenerateQRCodeRequest) -> tuple[str, bytes]:
-        _, _, image_bytes, safe_filename, _ = self._prepare_generation_assets(payload)
+        item, serialized_payload, image_bytes, safe_filename, _ = (
+            self._prepare_generation_assets(payload)
+        )
+
+        salvar_produto(self.db, item)
+
         return safe_filename, image_bytes
 
     def read_qrcode(self, image_bytes: bytes) -> ReadQRCodeResponse:
         image = self._decode_image_bytes(image_bytes)
         raw_payload = self._detect_qrcode_payload(image)
         item = self._parse_payload_to_item(raw_payload)
+
+        salvar_produto(self.db, item)
+
         sort_preview = self.sorter_service.preview_sort(item=item)
 
         return ReadQRCodeResponse(

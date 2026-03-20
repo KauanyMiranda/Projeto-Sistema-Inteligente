@@ -37,7 +37,7 @@ VALID_BRAZILIAN_UFS = {
 class RegionEnum(str, Enum):
     NORTE = "NORTE"
     NORDESTE = "NORDESTE"
-    CENTRO_OESTE = "CENTRO_OESTE"
+    CENTRO_OESTE = "CENTRO-OESTE"
     SUDESTE = "SUDESTE"
     SUL = "SUL"
 
