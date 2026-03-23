@@ -144,6 +144,7 @@ Casos cobertos:
   - Inclusao de dependencias para persistencia e integracao:
     - `sqlalchemy>=2.0.35,<3.0.0`
     - `pymysql>=1.1.1,<2.0.0`
+    - `cryptography>=42.0.0,<47.0.0`
     - `requests>=2.32.0,<3.0.0`
 
 ### 2026-03-20
