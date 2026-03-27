@@ -9,7 +9,7 @@ HTTP_TIMEOUT_SECONDS = 5
 
 # Modo de envio ao EV3 via rede.
 EV3_BRIDGE_ENABLED = True
-EV3_HOST = "192.168.0.50"  # ajuste para o IP real do EV3
+EV3_HOST = "192.168.0.1"  # ajuste para o IP real do EV3
 EV3_PORT = 8765
 EV3_CONNECT_TIMEOUT_SECONDS = 2.0
 EV3_ACK_TIMEOUT_SECONDS = 12.0
@@ -90,31 +90,38 @@ try:
                 )
                 response.raise_for_status()
                 response_data = response.json()
-
-                print("\nResposta da API:")
-                print(response_data)
-
-                api_data = response_data.get("data", {})
-                region = (
-                    api_data.get("rota", {})
-                    .get("region")
-                )
-                item_id = (
-                    api_data.get("item", {})
-                    .get("id_item")
-                )
-
-                if region:
-                    if bridge is not None:
-                        ack = bridge.send_region(region=region, item_id=item_id)
-                        print("ACK EV3:", ack)
-                    elif actuator is not None:
-                        actuator.execute_region(region=region)
-                else:
-                    print("Nao foi possivel obter a regiao na resposta da API.")
-
             except Exception as e:
                 print("Erro ao chamar API:", e)
+                continue
+
+            print("\nResposta da API:")
+            print(response_data)
+
+            api_data = response_data.get("data", {})
+            region = (
+                api_data.get("rota", {})
+                .get("region")
+            )
+            item_id = (
+                api_data.get("item", {})
+                .get("id_item")
+            )
+
+            if region:
+                if bridge is not None:
+                    try:
+                        ack = bridge.send_region(region=region, item_id=item_id)
+                        print("ACK EV3:", ack)
+                    except Exception as e:
+                        print(
+                            "Erro ao enviar comando ao EV3:",
+                            e,
+                            f"(host={EV3_HOST}, port={EV3_PORT})",
+                        )
+                elif actuator is not None:
+                    actuator.execute_region(region=region)
+            else:
+                print("Nao foi possivel obter a regiao na resposta da API.")
 
         # desenhar o quadrado no QR
         if bbox is not None:
