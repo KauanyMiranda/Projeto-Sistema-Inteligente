@@ -14,7 +14,7 @@ A API foi desenhada para:
 - Determinar a acao de separacao logistica com base na regiao de destino.
 - Servir de base para futura integracao com camera em tempo real e controle de atuadores.
 
-## 3. Arquitetura inicial
+## 3. Arquitetura atual
 
 Arquitetura em camadas:
 
@@ -22,8 +22,9 @@ Arquitetura em camadas:
 - `app/schemas`: contratos de entrada/saida e validacoes.
 - `app/services`: regras de negocio (geracao/leitura de QR e logica de separacao).
 - `app/core`: configuracoes globais e tratamento de excecoes.
+- `app/core/database.py`: configuracao de engine SQLAlchemy e fabrica de sessoes.
 - `app/utils`: utilitarios transversais.
-- `app/models`: reservado para evolucao futura (ORM/entidades).
+- `app/models`: entidades ORM para persistencia de produto e regiao.
 
 Decisoes principais:
 
@@ -82,6 +83,10 @@ Decisoes principais:
   - Entrada: upload de imagem com QR.
   - Saida: payload bruto, dados validados e preview de separacao.
 
+- `POST /api/v1/qrcode/read-text`
+  - Entrada: payload textual contendo o conteudo do QR Code.
+  - Saida: item validado e decisao de rota de separacao.
+
 ### Sorting
 
 - `POST /api/v1/sort/preview`
@@ -94,7 +99,7 @@ Regioes aceitas:
 
 - `NORTE`
 - `NORDESTE`
-- `CENTRO_OESTE`
+- `CENTRO-OESTE`
 - `SUDESTE`
 - `SUL`
 
@@ -130,3 +135,44 @@ Casos cobertos:
 - Criar fila/event bus para comandos de atuadores.
 - Implementar camada de driver para hardware (serial, MQTT, PLC).
 - Adicionar autenticacao, autorizacao e auditoria para uso real.
+
+## 9. Registro de alterações
+
+### 2026-03-23
+
+- `703412e` - feat: update requirements to include additional dependencies for enhanced functionality
+  - Inclusao de dependencias para persistencia e integracao:
+    - `sqlalchemy>=2.0.35,<3.0.0`
+    - `pymysql>=1.1.1,<2.0.0`
+    - `cryptography>=42.0.0,<47.0.0`
+    - `requests>=2.32.0,<3.0.0`
+
+### 2026-03-20
+
+- `9acdfc8` - feat: implement QR code reading and processing with database integration
+  - Integracao de banco no fluxo da API:
+    - Nova configuracao de conexao em `app/core/database.py` (engine e `SessionLocal`).
+    - Novos modelos ORM: `ProdutoModel` e `RegiaoModel`.
+    - Novo servico `salvar_produto` em `app/services/produto_service.py`.
+    - Injecao de dependencia de sessao de banco em `app/api/deps.py`.
+    - `QRCodeService` passou a persistir produtos nos fluxos de geracao e leitura (`generate`, `generate/download`, `read`).
+  - Novo endpoint `POST /api/v1/qrcode/read-text` para processar payload textual de QR.
+  - Novo schema `QRCodeTextRequest` e script `webcam_reader.py` para leitura via webcam.
+  - Ajuste de enum de regiao: `CENTRO_OESTE` para `CENTRO-OESTE`.
+
+### 2026-03-13
+
+- `b7b17a3` - feat: add endpoint for QR code generation with direct download option
+  - Novo endpoint `POST /api/v1/qrcode/generate/download`, retornando PNG para download direto.
+  - Refatoracao no `QRCodeService` com metodo compartilhado `_prepare_generation_assets`.
+
+- `c1a6afc` - fix: correct endpoint path for API v1 status
+  - Correcao da rota de status da v1 para `GET /api/v1/`.
+
+- `f68b6e2` - fix: correct format of ALLOWED_IMAGE_CONTENT_TYPES in .env.example
+  - Correcao de formato da variavel para lista JSON:
+    - de `image/png,image/jpeg,image/jpg,image/webp`
+    - para `["image/png","image/jpeg","image/jpg","image/webp"]`
+
+- `545cde9` - chore: update .gitignore to include __pycache__ and Python bytecode files; remove cached .pyc files
+  - Higienizacao do repositorio com remocao de bytecodes versionados e ajuste de `.gitignore`.
