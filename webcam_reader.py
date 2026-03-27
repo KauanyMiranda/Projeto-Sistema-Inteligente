@@ -3,7 +3,7 @@ import requests
 
 URL_API = "http://127.0.0.1:8000/api/v1/qrcode/read-text"
 
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
 detector = cv2.QRCodeDetector()
 
 ultimo_qr = None
