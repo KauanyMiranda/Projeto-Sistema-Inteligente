@@ -48,8 +48,8 @@ DEFAULT_REGION_ROUTING = {
 class EV3Actuator:
     def __init__(
         self,
-        simulation_mode: bool = False,
-        region_routing: dict[str, dict[str, int | str | None]] | None = None,
+        simulation_mode=False,
+        region_routing=None,
         **_ignored_legacy_kwargs,
     ):
         self.simulation_mode = simulation_mode
@@ -84,11 +84,11 @@ class EV3Actuator:
             print("Falha ao inicializar motores EV3. Indo para simulacao:", e)
             self.simulation_mode = True
 
-    def execute_region(self, region: str) -> None:
+    def execute_region(self, region):
         route = self.region_routing.get(region)
         if route is None:
             print(f"Regiao nao mapeada para atuacao: {region}")
-            return
+            return False
 
         esteira_speed = route["esteira_speed"]
         esteira_time_ms = route["esteira_time_ms"]
@@ -104,14 +104,18 @@ class EV3Actuator:
                 print(
                     f"[SIMULACAO] {region}: {braco} run_target(speed={braco_speed}, target={braco_target})"
                 )
-            return
+            return True
 
         self.motor_esteira.run_time(esteira_speed, esteira_time_ms, wait=True)
 
         if braco is None:
-            return
+            return True
 
         if braco == "BRACO_1":
             self.motor_braco1.run_target(braco_speed, braco_target, wait=True)
         elif braco == "BRACO_2":
             self.motor_braco2.run_target(braco_speed, braco_target, wait=True)
+        else:
+            return False
+
+        return True
