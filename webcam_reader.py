@@ -8,17 +8,9 @@ HTTP_TIMEOUT_SECONDS = 5
 
 # Deixe True para testar sem EV3 conectado.
 SIMULATION_MODE = True
-TURN_DEGREES = 90
-TURN_SPEED_PERCENT = 25
-CW_SIGN = 1
-CCW_SIGN = -1
 
 actuator = EV3Actuator(
     simulation_mode=SIMULATION_MODE,
-    turn_degrees=TURN_DEGREES,
-    turn_speed_percent=TURN_SPEED_PERCENT,
-    cw_sign=CW_SIGN,
-    ccw_sign=CCW_SIGN,
 )
 
 cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)

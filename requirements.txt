@@ -10,3 +10,4 @@ opencv-python>=4.10.0.84,<5.0.0
 numpy>=1.26.0,<3.0.0
 requests>=2.32.0,<3.0.0
 python-multipart>=0.0.9,<1.0.0
+pybricks>=3.6.1,<4.0.0
