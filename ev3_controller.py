@@ -148,8 +148,9 @@ class EV3Actuator:
             except Exception:
                 continue
 
-            if address in ("outA", "outB", "outC", "outD"):
-                connected.append(address)
+            normalized = self._normalize_output_port(address)
+            if normalized is not None and normalized not in connected:
+                connected.append(normalized)
 
         return connected
 
@@ -208,7 +209,18 @@ class EV3Actuator:
         role,
     ):
         if override:
-            override = override.strip()
+            override = self._normalize_output_port(override)
+            if override is None:
+                if required:
+                    raise RuntimeError(
+                        "Porta configurada para {} e invalida. "
+                        "Use outA/outB/outC/outD.".format(role)
+                    )
+                print(
+                    "Aviso: porta configurada para {} e invalida. "
+                    "Ignorando este motor.".format(role)
+                )
+                return None
             if override not in connected:
                 if required:
                     raise RuntimeError(
@@ -245,6 +257,29 @@ class EV3Actuator:
                     connected,
                 )
             )
+        return None
+
+    def _normalize_output_port(self, value):
+        if value is None:
+            return None
+
+        text = str(value).strip()
+        if not text:
+            return None
+
+        if ":" in text:
+            text = text.split(":")[-1].strip()
+
+        lower = text.lower()
+        if lower == "outa":
+            return "outA"
+        if lower == "outb":
+            return "outB"
+        if lower == "outc":
+            return "outC"
+        if lower == "outd":
+            return "outD"
+
         return None
 
     def _init_pybricks(self):
