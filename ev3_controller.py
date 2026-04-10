@@ -111,6 +111,7 @@ class EV3Actuator:
             self.motor_esteira = EV3Dev2Motor(esteira_port)
             self.motor_braco1 = EV3Dev2Motor(braco1_port) if braco1_port else None
             self.motor_braco2 = EV3Dev2Motor(braco2_port) if braco2_port else None
+            self._reset_arm_positions()
 
             self.ready = True
             self.backend = "ev3dev2"
@@ -130,6 +131,24 @@ class EV3Actuator:
             self.motor_braco2 = None
             self.ready = False
             return False
+
+    def _reset_arm_positions(self):
+        for motor_name, motor in (
+            ("braco1", self.motor_braco1),
+            ("braco2", self.motor_braco2),
+        ):
+            if motor is None:
+                continue
+            try:
+                motor.position = 0
+                print("Encoder do {} zerado no startup.".format(motor_name))
+            except Exception as e:
+                print(
+                    "Aviso: nao foi possivel zerar encoder do {}: {}".format(
+                        motor_name,
+                        e,
+                    )
+                )
 
     def _get_connected_outputs(self):
         connected = []
@@ -328,7 +347,7 @@ class EV3Actuator:
                         braco_speed,
                         braco_target,
                     )
-            )
+                )
             return True
 
         if self.backend == "ev3dev2":
@@ -385,11 +404,13 @@ class EV3Actuator:
         braco_target,
     ):
         try:
-            self._run_timed(
+            if not self._run_timed(
                 motor=self.motor_esteira,
                 speed=esteira_speed,
                 time_ms=esteira_time_ms,
-            )
+            ):
+                print("Timeout/erro na atuacao da esteira.")
+                return False
 
             if braco is None:
                 return True
@@ -406,11 +427,13 @@ class EV3Actuator:
                 print("Motor do {} nao configurado/conectado.".format(braco))
                 return False
 
-            self._run_to_abs_pos(
+            if not self._run_to_abs_pos(
                 motor=target_motor,
                 speed=braco_speed,
                 target=braco_target,
-            )
+            ):
+                print("Timeout/erro na atuacao do {}.".format(braco))
+                return False
             return True
         except Exception as e:
             print(
@@ -429,7 +452,7 @@ class EV3Actuator:
         except Exception:
             pass
         motor.command = "run-timed"
-        self._wait_motor(motor=motor, fallback_seconds=float(time_ms) / 1000.0)
+        return self._wait_motor(motor=motor, fallback_seconds=float(time_ms) / 1000.0)
 
     def _run_to_abs_pos(self, motor, speed, target):
         motor.speed_sp = int(abs(speed))
@@ -439,19 +462,41 @@ class EV3Actuator:
         except Exception:
             pass
         motor.command = "run-to-abs-pos"
-        self._wait_motor(motor=motor, fallback_seconds=2.0)
+        return self._wait_motor(motor=motor, fallback_seconds=2.0)
 
     def _wait_motor(self, motor, fallback_seconds):
+        timeout_ms = max(500, int(fallback_seconds * 1000.0) + 500)
+
         try:
-            motor.wait_while("running")
-            return
+            motor.wait_while("running", timeout=timeout_ms)
+            return True
         except TypeError:
             try:
-                motor.wait_while("running", timeout=int(fallback_seconds * 1000))
-                return
+                motor.wait_while("running")
+                return True
             except Exception:
                 pass
         except Exception:
             pass
 
-        time.sleep(max(0.05, fallback_seconds))
+        deadline = time.time() + max(0.1, fallback_seconds)
+        while time.time() < deadline:
+            try:
+                state = getattr(motor, "state", None)
+                if state is None:
+                    break
+                if "running" not in state:
+                    return True
+            except Exception:
+                break
+            time.sleep(0.05)
+
+        try:
+            motor.stop()
+        except Exception:
+            try:
+                motor.command = "stop"
+            except Exception:
+                pass
+
+        return False
