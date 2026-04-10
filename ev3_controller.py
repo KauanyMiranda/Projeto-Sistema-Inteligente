@@ -2,6 +2,9 @@ import time
 import os
 
 DEFAULT_ARM_TURN_DEGREES = 360
+DEFAULT_BRACO1_PARK_DEGREES = -120
+DEFAULT_BRACO2_PARK_DEGREES = 120
+DEFAULT_ARM_PARK_SPEED = 220
 
 try:
     from ev3dev2.motor import Motor as EV3Dev2Motor
@@ -135,6 +138,12 @@ class EV3Actuator:
             return False
 
     def _reset_arm_positions(self):
+        park_speed = self._get_arm_park_speed()
+        park_targets = {
+            "braco1": self._get_braco1_park_degrees(),
+            "braco2": self._get_braco2_park_degrees(),
+        }
+
         for motor_name, motor in (
             ("braco1", self.motor_braco1),
             ("braco2", self.motor_braco2),
@@ -149,6 +158,31 @@ class EV3Actuator:
                     "Aviso: nao foi possivel zerar encoder do {}: {}".format(
                         motor_name,
                         e,
+                    )
+                )
+                continue
+
+            target = park_targets.get(motor_name)
+            if target == 0:
+                print(
+                    "Posicao de park do {} = 0; mantendo posicao atual.".format(
+                        motor_name
+                    )
+                )
+                continue
+
+            if self._run_to_abs_pos(motor=motor, speed=park_speed, target=target):
+                print(
+                    "{} estacionado em {} graus (fora da esteira).".format(
+                        motor_name,
+                        target,
+                    )
+                )
+            else:
+                print(
+                    "Aviso: falha ao estacionar {} em {} graus.".format(
+                        motor_name,
+                        target,
                     )
                 )
 
@@ -466,7 +500,9 @@ class EV3Actuator:
         except Exception:
             pass
         motor.command = "run-to-abs-pos"
-        return self._wait_motor(motor=motor, fallback_seconds=2.0)
+        fallback_seconds = float(abs(int(target))) / float(max(1, abs(int(speed)))) + 1.0
+        fallback_seconds = max(1.5, fallback_seconds)
+        return self._wait_motor(motor=motor, fallback_seconds=fallback_seconds)
 
     def _run_full_turn(self, motor, speed, direction):
         turn_degrees = self._get_arm_turn_degrees()
@@ -514,6 +550,54 @@ class EV3Actuator:
             )
             return DEFAULT_ARM_TURN_DEGREES
 
+        return value
+
+    def _get_arm_park_speed(self):
+        return self._get_positive_env_int(
+            env_name="EV3_ARM_PARK_SPEED",
+            default_value=DEFAULT_ARM_PARK_SPEED,
+        )
+
+    def _get_braco1_park_degrees(self):
+        return self._get_env_int(
+            env_name="EV3_BRACO1_PARK_DEGREES",
+            default_value=DEFAULT_BRACO1_PARK_DEGREES,
+        )
+
+    def _get_braco2_park_degrees(self):
+        return self._get_env_int(
+            env_name="EV3_BRACO2_PARK_DEGREES",
+            default_value=DEFAULT_BRACO2_PARK_DEGREES,
+        )
+
+    def _get_env_int(self, env_name, default_value):
+        raw = os.getenv(env_name)
+        if raw is None:
+            return default_value
+
+        try:
+            return int(raw.strip())
+        except Exception:
+            print(
+                "Aviso: {} invalido ({}). Usando {}.".format(
+                    env_name,
+                    raw,
+                    default_value,
+                )
+            )
+            return default_value
+
+    def _get_positive_env_int(self, env_name, default_value):
+        value = self._get_env_int(env_name=env_name, default_value=default_value)
+        if value <= 0:
+            print(
+                "Aviso: {} deve ser > 0 ({}). Usando {}.".format(
+                    env_name,
+                    value,
+                    default_value,
+                )
+            )
+            return default_value
         return value
 
     def _wait_motor(self, motor, fallback_seconds):
