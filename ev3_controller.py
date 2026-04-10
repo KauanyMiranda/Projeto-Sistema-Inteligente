@@ -1,6 +1,8 @@
 import time
 import os
 
+DEFAULT_ARM_TURN_DEGREES = 360
+
 try:
     from ev3dev2.motor import Motor as EV3Dev2Motor
     from ev3dev2.motor import OUTPUT_B, OUTPUT_C, OUTPUT_D
@@ -340,12 +342,13 @@ class EV3Actuator:
                 )
             )
             if braco is not None:
+                turn_direction = "anti-horario" if (braco_target or 0) < 0 else "horario"
                 print(
-                    "[SIMULACAO] {}: {} run_target(speed={}, target={})".format(
+                    "[SIMULACAO] {}: {} giro completo ({}), speed={}".format(
                         region,
                         braco,
+                        turn_direction,
                         braco_speed,
-                        braco_target,
                     )
                 )
             return True
@@ -427,10 +430,11 @@ class EV3Actuator:
                 print("Motor do {} nao configurado/conectado.".format(braco))
                 return False
 
-            if not self._run_to_abs_pos(
+            turn_direction = -1 if braco_target < 0 else 1
+            if not self._run_full_turn(
                 motor=target_motor,
                 speed=braco_speed,
-                target=braco_target,
+                direction=turn_direction,
             ):
                 print("Timeout/erro na atuacao do {}.".format(braco))
                 return False
@@ -463,6 +467,54 @@ class EV3Actuator:
             pass
         motor.command = "run-to-abs-pos"
         return self._wait_motor(motor=motor, fallback_seconds=2.0)
+
+    def _run_full_turn(self, motor, speed, direction):
+        turn_degrees = self._get_arm_turn_degrees()
+        position_delta = turn_degrees if direction >= 0 else -turn_degrees
+        return self._run_to_rel_pos(
+            motor=motor,
+            speed=speed,
+            delta=position_delta,
+        )
+
+    def _run_to_rel_pos(self, motor, speed, delta):
+        speed_abs = int(max(1, abs(speed)))
+        position_delta = int(delta)
+
+        motor.speed_sp = speed_abs
+        motor.position_sp = position_delta
+        try:
+            motor.stop_action = "hold"
+        except Exception:
+            pass
+        motor.command = "run-to-rel-pos"
+
+        fallback_seconds = float(abs(position_delta)) / float(speed_abs) + 1.0
+        fallback_seconds = max(1.5, fallback_seconds)
+        return self._wait_motor(motor=motor, fallback_seconds=fallback_seconds)
+
+    def _get_arm_turn_degrees(self):
+        raw = os.getenv("EV3_ARM_TURN_DEGREES")
+        if raw is None:
+            return DEFAULT_ARM_TURN_DEGREES
+
+        try:
+            value = int(raw.strip())
+        except Exception:
+            print(
+                "Aviso: EV3_ARM_TURN_DEGREES invalido ({}). "
+                "Usando {}.".format(raw, DEFAULT_ARM_TURN_DEGREES)
+            )
+            return DEFAULT_ARM_TURN_DEGREES
+
+        if value <= 0:
+            print(
+                "Aviso: EV3_ARM_TURN_DEGREES deve ser > 0 ({}). "
+                "Usando {}.".format(value, DEFAULT_ARM_TURN_DEGREES)
+            )
+            return DEFAULT_ARM_TURN_DEGREES
+
+        return value
 
     def _wait_motor(self, motor, fallback_seconds):
         timeout_ms = max(500, int(fallback_seconds * 1000.0) + 500)
