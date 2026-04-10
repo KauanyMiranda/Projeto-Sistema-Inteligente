@@ -1,4 +1,5 @@
 import time
+import os
 
 try:
     from ev3dev2.motor import Motor as EV3Dev2Motor
@@ -94,15 +95,32 @@ class EV3Actuator:
             return False
 
         try:
-            self.motor_esteira = EV3Dev2Motor(OUTPUT_B)
-            self.motor_braco1 = EV3Dev2Motor(OUTPUT_C)
-            self.motor_braco2 = EV3Dev2Motor(OUTPUT_D)
+            connected_outputs = self._get_connected_outputs()
+            selected = self._select_ev3dev2_ports(connected_outputs)
+
+            esteira_port = selected["esteira"]
+            braco1_port = selected["braco1"]
+            braco2_port = selected["braco2"]
+
+            if esteira_port is None:
+                raise RuntimeError(
+                    "Nenhum motor detectado para esteira. "
+                    "Conecte ao menos um motor em outA/outB/outC/outD."
+                )
+
+            self.motor_esteira = EV3Dev2Motor(esteira_port)
+            self.motor_braco1 = EV3Dev2Motor(braco1_port) if braco1_port else None
+            self.motor_braco2 = EV3Dev2Motor(braco2_port) if braco2_port else None
 
             self.ready = True
             self.backend = "ev3dev2"
             print(
-                "EV3 pronto com ev3dev2: esteira em B, "
-                "braco1 em C, braco2 em D."
+                "EV3 pronto com ev3dev2: esteira em {}, "
+                "braco1 em {}, braco2 em {}.".format(
+                    esteira_port or "N/A",
+                    braco1_port or "N/A",
+                    braco2_port or "N/A",
+                )
             )
             return True
         except Exception as e:
@@ -112,6 +130,122 @@ class EV3Actuator:
             self.motor_braco2 = None
             self.ready = False
             return False
+
+    def _get_connected_outputs(self):
+        connected = []
+        base = "/sys/class/tacho-motor"
+
+        try:
+            entries = sorted(os.listdir(base))
+        except Exception:
+            return connected
+
+        for entry in entries:
+            address_path = os.path.join(base, entry, "address")
+            try:
+                with open(address_path, "r") as fh:
+                    address = fh.read().strip()
+            except Exception:
+                continue
+
+            if address in ("outA", "outB", "outC", "outD"):
+                connected.append(address)
+
+        return connected
+
+    def _select_ev3dev2_ports(self, connected_outputs):
+        est_override = os.getenv("EV3_ESTEIRA_PORT")
+        br1_override = os.getenv("EV3_BRACO1_PORT")
+        br2_override = os.getenv("EV3_BRACO2_PORT")
+
+        taken = set()
+        result = {"esteira": None, "braco1": None, "braco2": None}
+
+        est_pref = ["outB", "outA", "outC", "outD"]
+        br1_pref = ["outC", "outA", "outD", "outB"]
+        br2_pref = ["outD", "outA", "outC", "outB"]
+
+        result["esteira"] = self._pick_port(
+            override=est_override,
+            preferred=est_pref,
+            connected=connected_outputs,
+            taken=taken,
+            required=True,
+            role="esteira",
+        )
+        if result["esteira"]:
+            taken.add(result["esteira"])
+
+        result["braco1"] = self._pick_port(
+            override=br1_override,
+            preferred=br1_pref,
+            connected=connected_outputs,
+            taken=taken,
+            required=False,
+            role="braco1",
+        )
+        if result["braco1"]:
+            taken.add(result["braco1"])
+
+        result["braco2"] = self._pick_port(
+            override=br2_override,
+            preferred=br2_pref,
+            connected=connected_outputs,
+            taken=taken,
+            required=False,
+            role="braco2",
+        )
+
+        return result
+
+    def _pick_port(
+        self,
+        override,
+        preferred,
+        connected,
+        taken,
+        required,
+        role,
+    ):
+        if override:
+            override = override.strip()
+            if override not in connected:
+                if required:
+                    raise RuntimeError(
+                        "Porta {} configurada para {} nao esta conectada. "
+                        "Portas conectadas: {}.".format(
+                            override,
+                            role,
+                            connected,
+                        )
+                    )
+                print(
+                    "Aviso: porta {} configurada para {} nao esta conectada. "
+                    "Ignorando este motor.".format(override, role)
+                )
+                return None
+            if override in taken:
+                raise RuntimeError(
+                    "Porta {} duplicada entre motores configurados.".format(override)
+                )
+            return override
+
+        for port in preferred:
+            if port in connected and port not in taken:
+                return port
+
+        for port in connected:
+            if port not in taken:
+                return port
+
+        if required:
+            raise RuntimeError(
+                "Nao ha porta livre para {}. Portas conectadas: {}.".format(
+                    role,
+                    connected,
+                )
+            )
+        return None
 
     def _init_pybricks(self):
         if EV3Brick is None or PybricksMotor is None or Port is None:
@@ -231,6 +365,10 @@ class EV3Actuator:
                 target_motor = self.motor_braco2
             else:
                 print("Braco nao mapeado para atuacao: {}".format(braco))
+                return False
+
+            if target_motor is None:
+                print("Motor do {} nao configurado/conectado.".format(braco))
                 return False
 
             self._run_to_abs_pos(
